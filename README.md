@@ -1,24 +1,39 @@
-# MigrationSql
+# Description
 
-TODO: Write a gem description
+Generates the sql equivalent of db/migrate into db/migration\_sql. Currently only works for Rails apps and Sequel.
 
 ## Installation
 
-Add this line to your application's Gemfile:
+If using bundler, add this line to your application's Gemfile:
 
     gem 'migration_sql'
 
-And then execute:
-
-    $ bundle
-
-Or install it yourself as:
+Or install it yourself with:
 
     $ gem install migration_sql
 
 ## Usage
 
-TODO: Write usage instructions here
+To dump your migration sql, use this rake task:
+```sh
+$ rake db:dump_migration_sql
+Saved sql for 20120605163256_add_some_column.rb
+...
+```
+
+The rake task runs on your test environment and assumes db:drop and db:create for dropping
+and creating your database. Additional db create tasks can be configured with
+`MigrationSql.db_create_tasks`. The rake task can be run multiple times and will only create
+sql files that don't already exist.
+
+## TODO
+* Write tests!
+* Consider adding ActiveRecord support using
+  [migration_sql_generator](https://github.com/muness/migration_sql_generator)
+
+## License
+
+MIT. See LICENSE for more.
 
 ## Contributing
 
