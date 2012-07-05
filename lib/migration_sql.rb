@@ -1,7 +1,7 @@
-require 'sequel/extensions/migration'
 require 'fileutils'
 require 'migration_sql/version'
 require 'migration_sql/railtie' if defined?(Rails)
+require 'migration_sql/sequel'
 
 module MigrationSql
   class << self; attr_accessor :current_migration_name, :loggable, :db_create_tasks; end
@@ -18,34 +18,26 @@ module MigrationSql
   end
 
   def self.dump
-    hook_into_sequel_classes
+    MigrationSql::Sequel.hook_into_classes
 
     previous_target = nil
     Dir['db/migrate/*.rb'].sort.each do |file|
       self.current_migration_name = File.basename(file)
       target = file[/\d+/].to_i
-      Sequel::Migrator.run(Sequel::Model.db, "db/migrate", :target => target, :current => previous_target)
+      MigrationSql::Sequel.run_migration previous_target, target
       previous_target = target
     end
   end
 
-  def self.hook_into_sequel_classes
-    Sequel::Model.db.extend DatabaseLogger
-
-    Sequel::Migration.class_eval do
-      class << self
-        alias_method :old_apply, :apply
-
-        def apply(db, direction)
-          if File.exists? MigrationSql.current_migration_file
-            old_apply(db, direction)
-          else
-            MigrationSql.log_sql { old_apply(db, direction) }
-            MigrationSql.insert_schema_migration
-            puts "Saved sql for #{MigrationSql.current_migration_name}"
-          end
-        end
-      end
+  # Takes a block which should run actual migration. Any args passed to this
+  # method are passed on to the block.
+  def self.apply_migration(*args)
+    if File.exists? current_migration_file
+      yield(*args)
+    else
+      log_sql { yield(*args) }
+      insert_schema_migration
+      puts "Saved sql for #{current_migration_name}"
     end
   end
 
@@ -63,15 +55,7 @@ module MigrationSql
     File.open(current_migration_file, 'a') { |file| file << sql << ";\n" }
   end
 
-  module DatabaseLogger
-    def execute(sql, opts = {})
-      MigrationSql.log(sql) if MigrationSql.loggable
-      super
-    end
-  end
-
   def self.invoke_pre_dump_tasks
-    p db_create_tasks
     (%w{environment db:drop} + db_create_tasks).each do |task|
       Rake::Task[task].invoke
     end
